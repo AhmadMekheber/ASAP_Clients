@@ -1,0 +1,11 @@
+@ASAP_Clients_HostAddress = http://localhost:5222
+
+GET {{ASAP_Clients_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+GET {{ASAP_Clients_HostAddress}}/api/Client
+Accept: application/json
+
+###
