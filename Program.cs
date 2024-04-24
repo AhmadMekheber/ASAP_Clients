@@ -29,10 +29,12 @@ builder.Services.AddScoped<IPreviousCloseResponseRepository, PreviousCloseRespon
 
 builder.Services.AddScoped<IPolygonManager, PolygonManager>();
 builder.Services.AddScoped<IClientManager, ClientManager>();
+builder.Services.AddScoped<IClientsMailManager, ClientsMailManager>();
 
 builder.Services.AddHttpClient();
 
 builder.Services.AddHostedService<PolygonDataService>();
+builder.Services.AddHostedService<ClientsMailService>();
 
 var app = builder.Build();
 
