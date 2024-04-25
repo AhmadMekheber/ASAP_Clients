@@ -10,6 +10,28 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddCors(options =>
+{
+  options.AddPolicy("ASAP_Policy", builder =>
+  {
+    // Allow requests from your Angular application's domain
+    builder.WithOrigins("http://localhost:4200")
+    .AllowAnyMethod()
+    .AllowAnyHeader(); // Replace with your actual domain
+
+    // Optionally, specify allowed methods, headers, etc.
+    //builder.WithMethods("GET", "POST", "PUT", "DELETE");
+    // builder.WithHeaders("Content-Type", "Authorization");
+  });
+});
+
+// var modelBuilder = new ODataConventionModelBuilder();
+// modelBuilder.EntityType<ClientDto>();
+
+// builder.Services.AddControllers().AddOData(
+//     options => options.Select().Filter().OrderBy().Expand().Count().SetMaxTop(null).AddRouteComponents(
+//         "odata",
+//         modelBuilder.GetEdmModel()));
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -44,6 +66,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors("ASAP_Policy");
 
 app.UseHttpsRedirection();
 

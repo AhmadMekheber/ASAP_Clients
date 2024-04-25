@@ -10,19 +10,22 @@ namespace ASAP_Clients.Services
     {
         private readonly IServiceProvider _serviceProvider;
 
+        private readonly IConfiguration _configuration;
+
         private Timer? _timer = null;
 
         private IClientsMailManager? _clientsMailManager = null;
 
-        public ClientsMailService(IServiceProvider serviceProvider)
+        public ClientsMailService(IServiceProvider serviceProvider, IConfiguration configuration)
         {
             _serviceProvider = serviceProvider;
+            _configuration = configuration;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _timer = new Timer(SendMails, null, TimeSpan.Zero,
-            TimeSpan.FromSeconds(60));
+            TimeSpan.FromSeconds(double.Parse(_configuration["Mail:SendsEvery"])));
 
             return Task.CompletedTask;
         }

@@ -22,7 +22,7 @@ namespace ASAP_Clients.Manager
             _configuration = configuration;
         }
 
-        private MailboxAddress SenderMailboxAddress => new MailboxAddress("ASAP Clients", "asap.clients@yandex.com");
+        private MailboxAddress SenderMailboxAddress => new MailboxAddress(_configuration["Mail:SenderName"], _configuration["Mail:SenderMailAddress"]);
 
         private async Task ConnectSmtpClientIfRequired() 
         {
@@ -60,12 +60,13 @@ namespace ASAP_Clients.Manager
         public async Task SendMailsToUnnotifiedClients()
         {
             var previousCloseResponses = await _unitOfWork.PreviousCloseResponseRepository.GetResponsesToNotify().ToListAsync();
+
+            if (previousCloseResponses.Any() == false)
+                return;
+
             var clients = await _unitOfWork.ClientRepository.GetNotDeleted().ToListAsync();
             
-            foreach (var previousCloseResponse in previousCloseResponses)
-            {
-                await SendPreviousCloseResponse(previousCloseResponse, clients);
-            }
+            await SendPreviousCloseResponse(previousCloseResponses, clients);
 
             await DisconnectSmtpClient();
 
@@ -77,37 +78,42 @@ namespace ASAP_Clients.Manager
             }
         }
 
-        private async Task SendPreviousCloseResponse(PreviousCloseResponse previousCloseResponse, List<Client> clients)
+        private async Task SendPreviousCloseResponse(List<PreviousCloseResponse> previousCloseResponses, List<Client> clients)
         {
             foreach(Client client in clients)
             {
-                await SendPreviousCloseResponseToClient(previousCloseResponse, client);
+                await SendPreviousCloseResponseToClient(previousCloseResponses, client);
             }
         }
 
-        private async Task SendPreviousCloseResponseToClient(PreviousCloseResponse previousCloseResponse, Client client)
+        private async Task SendPreviousCloseResponseToClient(List<PreviousCloseResponse> previousCloseResponses, Client client)
         {
-            PolygonRequest polygonRequest = previousCloseResponse.Request;
-            PolygonTicker polygonTicker = polygonRequest.Ticker;
-
             try
             {
+                string htmlBody = string.Empty;
+                
+                foreach (PreviousCloseResponse previousCloseResponse in previousCloseResponses) 
+                {
+                    htmlBody += generatepriceTable(previousCloseResponse);
+                }
+
                 var message = new MimeMessage();
 
                 message.From.Add(SenderMailboxAddress);
-                message.To.Add(new MailboxAddress("Ahmad Mekheber", client.Email));
-                message.Subject = $"{polygonTicker.Name} ({polygonTicker.CompanyName}) Previouse Close";
+                message.To.Add(new MailboxAddress($"{client.FirstName} {client.LastName}", client.Email));
+                message.Subject = _configuration["Mail:Subject"];
 
                 // Create the email body (text or HTML)
-                var bodyBuilder = new BodyBuilder();
-                bodyBuilder.TextBody = "This email is for Testing ASAP Clients Program.";
-                // OR (for HTML body)
-                // bodyBuilder.HtmlBody = @"<h1>This is the HTML body of your email</h1>";
+                var bodyBuilder = new BodyBuilder { HtmlBody = htmlBody };
+
                 message.Body = bodyBuilder.ToMessageBody();
 
                 await ConnectSmtpClientIfRequired();
                 // Send the email message
                 await _smtpClient.SendAsync(message);
+
+                //Wait 2 seconds after sending each mail because the mail provider would consider this a spam email and it won't be delivered.
+                Thread.Sleep(2000);
 
                 Console.WriteLine("Email sent successfully!");
             }
@@ -120,5 +126,45 @@ namespace ASAP_Clients.Manager
                 Console.WriteLine(ex.Message);
             }
         }
+
+        private string generatepriceTable(PreviousCloseResponse previousCloseResponse) {
+            return pricesTableTemplate
+                        .Replace("@TickerSymbol", previousCloseResponse.Request?.Ticker?.Name)
+                        .Replace("@TickerCompany", previousCloseResponse.Request?.Ticker?.CompanyName)
+                        .Replace("@OpenPrice", previousCloseResponse.OpenPrice.ToString())
+                        .Replace("@ClosePrice", previousCloseResponse.ClosePrice.ToString())
+                        .Replace("@LowestPrice", previousCloseResponse.LowestPrice.ToString())
+                        .Replace("@HighestPrice", previousCloseResponse.HighestPrice.ToString())
+                        .Replace("@VolumeWeightedAveragePrice", previousCloseResponse.VolumeWeightedAveragePrice.ToString())
+                        .Replace("@TransactionsCount", previousCloseResponse.TransactionsCount.ToString())
+                        .Replace("@TradingVolume", previousCloseResponse.TradingVolume.ToString())
+                        .Replace("@AggregateWindowDate", previousCloseResponse.AggregateWindowDate.ToString());
+        }
+
+        private string pricesTableTemplate = @"
+            <h3>@TickerSymbol (@TickerCompany)</h3>
+            <table style='border: 1px solid #ddd; border-collapse: collapse;'>
+                <tr>
+                    <th style='padding: 5px 10px;'>Open</th>
+                    <th style='padding: 5px 10px;'>Close</th>
+                    <th style='padding: 5px 10px;'>Lowest</th>
+                    <th style='padding: 5px 10px;'>Highest</th>
+                    <th style='padding: 5px 10px;'>Average Price</th>
+                    <th style='padding: 5px 10px;'>Transactions Count</th>
+                    <th style='padding: 5px 10px;'>Volume</th>
+                    <th style='padding: 5px 10px;'>Aggregate Window Date</th>
+                </tr>
+                <tr>
+                    <td style='padding: 5px 10px;'>@OpenPrice</td>
+                    <td style='padding: 5px 10px;'>@ClosePrice</td>
+                    <td style='padding: 5px 10px;'>@LowestPrice</td>
+                    <td style='padding: 5px 10px;'>@HighestPrice</td>
+                    <td style='padding: 5px 10px;'>@VolumeWeightedAveragePrice</td>
+                    <td style='padding: 5px 10px;'>@TransactionsCount</td>
+                    <td style='padding: 5px 10px;'>@TradingVolume</td>
+                    <td style='padding: 5px 10px;'>@AggregateWindowDate</td>
+                </tr>
+            </table>
+        ";
     }
 }

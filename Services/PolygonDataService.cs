@@ -10,22 +10,26 @@ namespace ASAP_Clients.Services
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IHttpClientFactory _httpClientFactory;
+
+        private readonly IConfiguration _configuration;
         private Timer? _timer = null;
 
         private IPolygonManager? _polygonManager = null;
 
         public PolygonDataService(
             IHttpClientFactory httpClientFactory,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _serviceProvider = serviceProvider;
+            _configuration = configuration;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _timer = new Timer(RetrieveAndStorePolygonData, null, TimeSpan.Zero,
-            TimeSpan.FromSeconds(60));
+            TimeSpan.FromSeconds(double.Parse(_configuration["Polygon:CallEvery"])));
 
             return Task.CompletedTask;
         }
@@ -44,12 +48,6 @@ namespace ASAP_Clients.Services
         
         private async void RetrieveAndStorePolygonData(object? state)
         {
-            // Implement your logic to retrieve data from Polygon.io API
-            // ... (code omitted for brevity)
-
-            // Store retrieved data in your database
-            // ... (code omitted for brevity)
-
             using (var scope = _serviceProvider.CreateScope())
             {
                 _polygonManager = scope.ServiceProvider.GetRequiredService<IPolygonManager>();
@@ -64,7 +62,6 @@ namespace ASAP_Clients.Services
                 throw new ArgumentNullException();
 
             var tickers = await _polygonManager.GetPolygonTickers();
-            // var tickerSymbols = new string[]{"MSFT", "AMZN","META", "AAPL", "NFLX"};
 
             var previousCloses = new List<(long tickerID, PreviousClose previousClose)>();
 
@@ -74,9 +71,6 @@ namespace ASAP_Clients.Services
 
                 if (previousClose != null)
                 {
-                    Console.WriteLine("Data is Parsed");
-                    Console.WriteLine(previousClose);
-
                     previousCloses.Add((ticker.ID, previousClose));
                 }
             }
@@ -89,9 +83,9 @@ namespace ASAP_Clients.Services
 
         private async Task<PreviousClose?> GetPreviousClose(string tickerSymbol)
         {
-            string apiKey = "LcfW3U3hh43SSYfggbj0vf7dTZgGuiok";
+            string apiKey = _configuration["Polygon:ApiKey"] ?? "";
 
-            var baseUrl = "https://api.polygon.io/v2/aggs/ticker/";
+            var baseUrl = _configuration["Polygon:BaseUrl"];
             var url = $"{baseUrl}{tickerSymbol}/prev?adjusted=true&apiKey={apiKey}";
 
             var httpClient = _httpClientFactory.CreateClient();
